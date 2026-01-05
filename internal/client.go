@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"iter"
 	"sync/atomic"
 	"time"
 
@@ -410,6 +411,14 @@ type (
 		// which can be polled for an outcome. Note that runID is optional and
 		// if not specified the most recent runID will be used.
 		GetWorkflowUpdateHandle(GetWorkflowUpdateHandleOptions) WorkflowUpdateHandle
+
+		ExecuteActivity(ctx context.Context, options ClientExecuteActivityOptions, activity any, args ...any) (ActivityHandle, error)
+
+		GetActivityHandle(activityID string, runID string) ActivityHandle
+
+		ListActivities(ctx context.Context, options ListActivitiesOptions) iter.Seq2[*ActivityExecutionMetadata, error]
+
+		CountActivities(ctx context.Context, options CountActivitiesOptions) (*CountActivitiesResult, error)
 
 		// WorkflowService provides access to the underlying gRPC service. This should only be used for advanced use cases
 		// that cannot be accomplished via other Client methods. Unlike calls to other Client methods, calls directly to the

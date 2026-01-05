@@ -231,7 +231,8 @@ type (
 		sessionEnvironment *testSessionEnvironmentImpl
 
 		// True if this was created only for testing activities not workflows.
-		activityEnvOnly bool
+		activityEnvOnly             bool
+		executeActivitiesInWorkflow bool
 
 		workflowFunctionExecuting bool
 		bufferedUpdateRequests    map[string][]func()
@@ -301,13 +302,14 @@ func newTestWorkflowEnvironmentImpl(s *WorkflowTestSuite, parentRegistry *regist
 		changeVersions: make(map[string]Version),
 		openSessions:   make(map[string]*SessionInfo),
 
-		doneChannel:            make(chan struct{}),
-		workerStopChannel:      make(chan struct{}),
-		dataConverter:          converter.GetDefaultDataConverter(),
-		failureConverter:       GetDefaultFailureConverter(),
-		runTimeout:             maxWorkflowTimeout,
-		bufferedUpdateRequests: make(map[string][]func()),
-		sdkFlags:               newSDKFlags(&workflowservice.GetSystemInfoResponse_Capabilities{SdkMetadata: true}),
+		doneChannel:                 make(chan struct{}),
+		workerStopChannel:           make(chan struct{}),
+		dataConverter:               converter.GetDefaultDataConverter(),
+		failureConverter:            GetDefaultFailureConverter(),
+		runTimeout:                  maxWorkflowTimeout,
+		bufferedUpdateRequests:      make(map[string][]func()),
+		sdkFlags:                    newSDKFlags(&workflowservice.GetSystemInfoResponse_Capabilities{SdkMetadata: true}),
+		executeActivitiesInWorkflow: true,
 	}
 
 	if debugMode {

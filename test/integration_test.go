@@ -8069,3 +8069,38 @@ func (ts *IntegrationTestSuite) TestUnhandledCommandAndMetrics() {
 	}
 	ts.Equal(1, workflowCompletedCount)
 }
+
+func (ts *IntegrationTestSuite) TestExecuteActivity() {
+	var a Activities
+	argument := "argument"
+
+	options := client.ExecuteActivityOptions{
+		ID:                     uuid.NewString(),
+		ScheduleToCloseTimeout: 10 * time.Second,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	act, err := ts.client.ExecuteActivity(ctx, options, a.EchoString, argument)
+	ts.NoError(err)
+
+	var result string
+	ts.NoError(act.Get(ctx, &result))
+	ts.Equal(argument, result)
+}
+
+func (ts *IntegrationTestSuite) TestInspectActivityInfoNoWorkflow() {
+	var a Activities
+
+	options := client.ExecuteActivityOptions{
+		ID:                     uuid.NewString(),
+		ScheduleToCloseTimeout: 15 * time.Second,
+		StartToCloseTimeout:    10 * time.Second,
+		RetryPolicy:            ts.workflows.defaultRetryPolicy(),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+	defer cancel()
+	act, err := ts.client.ExecuteActivity(ctx, options, a.InspectActivityInfoNoWorkflow,
+		ts.config.Namespace, options.ID, ts.taskQueueName, options.ScheduleToCloseTimeout, options.StartToCloseTimeout, options.RetryPolicy)
+	ts.NoError(err)
+	ts.NoError(act.Get(ctx, nil))
+}

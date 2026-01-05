@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"iter"
 	"strconv"
 
 	"github.com/nexus-rpc/sdk-go/nexus"
@@ -699,6 +700,22 @@ func (t *testSuiteClientForNexusOperations) UpdateWorkerBuildIdCompatibility(ctx
 
 // UpdateWorkerVersioningRules implements Client.
 func (t *testSuiteClientForNexusOperations) UpdateWorkerVersioningRules(ctx context.Context, options UpdateWorkerVersioningRulesOptions) (*WorkerVersioningRules, error) {
+	panic("unimplemented in the test environment")
+}
+
+func (t *testSuiteClientForNexusOperations) ExecuteActivity(ctx context.Context, options ClientExecuteActivityOptions, activity any, args ...any) (ActivityHandle, error) {
+	panic("unimplemented in the test environment")
+}
+
+func (t *testSuiteClientForNexusOperations) GetActivityHandle(activityID string, runID string) ActivityHandle {
+	panic("unimplemented in the test environment")
+}
+
+func (t *testSuiteClientForNexusOperations) ListActivities(ctx context.Context, options ListActivitiesOptions) iter.Seq2[*ActivityExecutionMetadata, error] {
+	panic("unimplemented in the test environment")
+}
+
+func (t *testSuiteClientForNexusOperations) CountActivities(ctx context.Context, options CountActivitiesOptions) (*CountActivitiesResult, error) {
 	panic("unimplemented in the test environment")
 }
 

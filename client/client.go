@@ -9,6 +9,7 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
+	"iter"
 
 	commonpb "go.temporal.io/api/common/v1"
 	enumspb "go.temporal.io/api/enums/v1"
@@ -896,6 +897,14 @@ type (
 	// Note, this is not related to any general concept of timing out or cancelling a running update, this is only related to the client call itself.
 	WorkflowUpdateServiceTimeoutOrCanceledError = internal.WorkflowUpdateServiceTimeoutOrCanceledError
 
+	ExecuteActivityOptions       = internal.ClientExecuteActivityOptions
+	ListActivitiesOptions        = internal.ListActivitiesOptions
+	CountActivitiesOptions       = internal.CountActivitiesOptions
+	CountActivitiesResult        = internal.CountActivitiesResult
+	ActivityHandle               = internal.ActivityHandle
+	ActivityExecutionMetadata    = internal.ActivityExecutionMetadata
+	ActivityExecutionDescription = internal.ActivityExecutionDescription
+
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.
 	Client interface {
@@ -1305,6 +1314,14 @@ type (
 		// which can be polled for an outcome. Note that runID is optional and
 		// if not specified the most recent runID will be used.
 		GetWorkflowUpdateHandle(ref GetWorkflowUpdateHandleOptions) WorkflowUpdateHandle
+
+		ExecuteActivity(ctx context.Context, options ExecuteActivityOptions, activity any, args ...any) (ActivityHandle, error)
+
+		GetActivityHandle(activityID string, runID string) ActivityHandle
+
+		ListActivities(ctx context.Context, options ListActivitiesOptions) iter.Seq2[*ActivityExecutionMetadata, error]
+
+		CountActivities(ctx context.Context, options CountActivitiesOptions) (*CountActivitiesResult, error)
 
 		// WorkflowService provides access to the underlying gRPC service. This should only be used for advanced use cases
 		// that cannot be accomplished via other Client methods. Unlike calls to other Client methods, calls directly to the
