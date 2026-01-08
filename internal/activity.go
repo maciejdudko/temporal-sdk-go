@@ -205,7 +205,7 @@ type (
 
 // IsWorkflowActivity returns true if this activity was started by a workflow.
 func (i *ActivityInfo) IsWorkflowActivity() bool {
-	return i.WorkflowExecution.ID == ""
+	return i.WorkflowExecution.ID != ""
 }
 
 // GetActivityInfo returns information about the currently executing activity.

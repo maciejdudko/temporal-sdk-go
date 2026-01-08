@@ -8076,6 +8076,7 @@ func (ts *IntegrationTestSuite) TestExecuteActivity() {
 
 	options := client.ExecuteActivityOptions{
 		ID:                     uuid.NewString(),
+		TaskQueue:              ts.taskQueueName,
 		ScheduleToCloseTimeout: 10 * time.Second,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)

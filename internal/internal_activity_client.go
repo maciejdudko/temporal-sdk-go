@@ -208,7 +208,7 @@ func (h *activityHandleImpl) Get(ctx context.Context, valuePtr any) error {
 			return h.client.failureConverter.FailureToError(failure)
 		}
 		if result := resp.GetOutcome().GetResult(); result != nil {
-			return h.client.dataConverter.FromPayloads(result)
+			return h.client.dataConverter.FromPayloads(result, valuePtr)
 		}
 	}
 }
