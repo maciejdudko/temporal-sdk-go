@@ -7863,6 +7863,8 @@ func (ts *IntegrationTestSuite) TestMutableSideEffectSummary() {
 }
 
 func (ts *IntegrationTestSuite) TestGrpcMessageTooLarge() {
+	ts.T().Skip("Does not work with newest server master branch") // see https://github.com/temporalio/temporal/pull/8610
+
 	assertGrpcErrorInHistory := func(ctx context.Context, run client.WorkflowRun) {
 		iter := ts.client.GetWorkflowHistory(ctx, run.GetID(), run.GetRunID(), true, enumspb.HISTORY_EVENT_FILTER_TYPE_ALL_EVENT)
 		for iter.HasNext() {
