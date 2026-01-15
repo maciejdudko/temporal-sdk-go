@@ -8107,3 +8107,210 @@ func (ts *IntegrationTestSuite) TestInspectActivityInfoNoWorkflow() {
 	ts.NoError(err)
 	ts.NoError(act.Get(ctx, nil))
 }
+
+func (ts *IntegrationTestSuite) TestExecuteActivitySuite() {
+	makeOptions := func() client.ExecuteActivityOptions {
+		return client.ExecuteActivityOptions{
+			ID:                     uuid.NewString(),
+			TaskQueue:              ts.taskQueueName,
+			ScheduleToCloseTimeout: 10 * time.Second,
+		}
+	}
+
+	var activities Activities
+
+	activityResultChan := make(chan string)
+	readFromChannelActivity := func() (string, error) {
+		return <-activityResultChan, nil
+	}
+	ts.worker.RegisterActivityWithOptions(readFromChannelActivity, activity.RegisterOptions{Name: "readFromChannelActivity"})
+	ts.Run("Describe activity", func() {
+		timeBeforeStart := time.Now().Add(-time.Millisecond)
+
+		options := makeOptions()
+		searchAttrKey := temporal.NewSearchAttributeKeyString("CustomStringField")
+		searchAttrValue := "CustomValue"
+		options.SearchAttributes = temporal.NewSearchAttributes(searchAttrKey.ValueSet(searchAttrValue))
+		options.Summary = "activity summary"
+
+		ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+		defer cancel()
+		handle, err := ts.client.ExecuteActivity(ctx, options, "readFromChannelActivity")
+		ts.NoError(err)
+		ts.Equal(options.ID, handle.GetID())
+		ts.NotEmpty(handle.GetRunID())
+
+		description, err := handle.Describe(ctx)
+		ts.NoError(err)
+		ts.Equal(enumspb.ACTIVITY_EXECUTION_STATUS_RUNNING, description.Status)
+		ts.Nil(description.RawExecutionListInfo)
+		ts.NotNil(description.RawExecutionInfo)
+		ts.Equal(options.ID, description.ActivityID)
+		ts.Equal(handle.GetRunID(), description.ActivityRunID)
+		ts.Equal("readFromChannelActivity", description.ActivityType)
+		ts.Equal(ts.taskQueueName, description.TaskQueue)
+		ts.EqualValues(1, description.Attempt)
+		ts.EqualValues(1, description.SearchAttributes.Size())
+		attr, hasAttr := description.SearchAttributes.GetString(searchAttrKey)
+		ts.True(hasAttr)
+		ts.Equal(searchAttrValue, attr)
+		summary, err := description.GetSummary()
+		ts.NoError(err)
+		ts.Equal(options.Summary, summary)
+
+		// ensure measurable amount of time passes, then complete activity
+		time.Sleep(100 * time.Millisecond)
+		activityResultChan <- ""
+		err = handle.Get(ctx, nil)
+		ts.NoError(err)
+
+		description, err = handle.Describe(ctx)
+		ts.NoError(err)
+		ts.Equal(enumspb.ACTIVITY_EXECUTION_STATUS_COMPLETED, description.Status)
+		ts.Equal(options.ID, description.ActivityID)
+		ts.Equal(handle.GetRunID(), description.ActivityRunID)
+		ts.True(description.ScheduleTime.After(timeBeforeStart))
+		ts.True(description.CloseTime.After(description.ScheduleTime))
+		ts.Greater(description.ExecutionDuration, int64(0))
+		ts.True(description.LastStartedTime.After(timeBeforeStart))
+		ts.True(description.LastAttemptCompleteTime.After(description.ScheduleTime))
+	})
+
+	ts.Run("Wait for activity result", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+		defer cancel()
+		handle, err := ts.client.ExecuteActivity(ctx, makeOptions(), "readFromChannelActivity")
+		ts.NoError(err)
+
+		receivedResultChan := make(chan string)
+		go func() {
+			var result string
+			err := handle.Get(ctx, &result)
+			ts.NoError(err)
+			receivedResultChan <- result
+		}()
+
+		select {
+		case <-receivedResultChan:
+			ts.Fail("received result too soon")
+		case <-time.After(time.Second):
+			// OK
+		}
+
+		result := "result"
+		activityResultChan <- result
+		ts.Equal(result, <-receivedResultChan)
+	})
+
+	ts.Run("Execute activity with argument", func() {
+		argument := "argument"
+
+		ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+		defer cancel()
+		handle, err := ts.client.ExecuteActivity(ctx, makeOptions(), activities.EchoString, argument)
+		ts.NoError(err)
+
+		var result string
+		err = handle.Get(ctx, &result)
+		ts.NoError(err)
+		ts.Equal(argument, result)
+	})
+
+	ts.Run("Cancel activity", func() {
+		reason := "cancellation reason"
+
+		ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+		defer cancel()
+		handle, err := ts.client.ExecuteActivity(ctx, makeOptions(), activities.HeartbeatUntilCanceled, 50*time.Millisecond)
+		ts.NoError(err)
+
+		err = handle.Cancel(ctx, client.CancelActivityOptions{Reason: reason})
+		ts.NoError(err)
+
+		var canceledErr *temporal.CanceledError
+		err = handle.Get(ctx, nil)
+		ts.ErrorAs(err, &canceledErr)
+
+		description, err := handle.Describe(ctx)
+		ts.NoError(err)
+		ts.Equal(enumspb.ACTIVITY_EXECUTION_STATUS_CANCELED, description.Status)
+		ts.Equal(reason, description.CanceledReason)
+	})
+
+	ts.Run("Terminate activity", func() {
+		reason := "termination reason"
+
+		ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+		defer cancel()
+		handle, err := ts.client.ExecuteActivity(ctx, makeOptions(), activities.HeartbeatUntilCanceled, 50*time.Millisecond)
+		ts.NoError(err)
+
+		err = handle.Terminate(ctx, client.TerminateActivityOptions{Reason: reason})
+		ts.NoError(err)
+
+		var terminatedErr *temporal.TerminatedError
+		err = handle.Get(ctx, nil)
+		ts.ErrorAs(err, &terminatedErr)
+
+		description, err := handle.Describe(ctx)
+		ts.NoError(err)
+		ts.Equal(enumspb.ACTIVITY_EXECUTION_STATUS_TERMINATED, description.Status)
+		ts.Empty(description.CanceledReason)
+	})
+
+	ts.Run("Inspect activity info", func() {
+		options := makeOptions()
+		options.StartToCloseTimeout = 5 * time.Second
+
+		ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+		defer cancel()
+		handle, err := ts.client.ExecuteActivity(ctx, options, activities.InspectActivityInfoNoWorkflow, ts.config.Namespace,
+			options.ID, ts.taskQueueName, options.ScheduleToCloseTimeout, options.StartToCloseTimeout, options.RetryPolicy)
+		ts.NoError(err)
+		ts.NoError(handle.Get(ctx, nil))
+	})
+
+	ts.Run("GetActivityHandle", func() {
+		options := makeOptions()
+		options.IDReusePolicy = enumspb.ACTIVITY_ID_REUSE_POLICY_ALLOW_DUPLICATE
+
+		executeActivity := func(ctx context.Context, argument string) client.ActivityHandle {
+			handle, err := ts.client.ExecuteActivity(ctx, options, activities.EchoString, argument)
+			ts.NoError(err)
+			var result string
+			err = handle.Get(ctx, &result)
+			ts.NoError(err)
+			ts.Equal(argument, result)
+			return handle
+		}
+
+		testGetHandle := func(ctx context.Context, runId string, expectedResult string) {
+			handle := ts.client.GetActivityHandle(options.ID, runId)
+			var result string
+			err := handle.Get(ctx, &result)
+			ts.NoError(err)
+			ts.Equal(expectedResult, result)
+
+			description, err := handle.Describe(ctx)
+			ts.NoError(err)
+			ts.Equal(options.ID, description.ActivityID)
+			if runId != "" {
+				ts.Equal(runId, description.ActivityRunID)
+			}
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), ctxTimeout)
+		defer cancel()
+
+		argument1 := "argument1"
+		act1Handle := executeActivity(ctx, argument1)
+		testGetHandle(ctx, "", argument1)
+
+		argument2 := "argument2"
+		act2Handle := executeActivity(ctx, argument2)
+		testGetHandle(ctx, "", argument2)
+
+		testGetHandle(ctx, act1Handle.GetRunID(), argument1)
+		testGetHandle(ctx, act2Handle.GetRunID(), argument2)
+	})
+}

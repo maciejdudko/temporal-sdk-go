@@ -904,6 +904,8 @@ type (
 	ActivityHandle               = internal.ActivityHandle
 	ActivityExecutionMetadata    = internal.ActivityExecutionMetadata
 	ActivityExecutionDescription = internal.ActivityExecutionDescription
+	CancelActivityOptions        = internal.CancelActivityOptions
+	TerminateActivityOptions     = internal.TerminateActivityOptions
 
 	// Client is the client for starting and getting information about a workflow executions as well as
 	// completing activities asynchronously.

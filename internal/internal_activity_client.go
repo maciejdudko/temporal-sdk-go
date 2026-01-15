@@ -179,10 +179,19 @@ func (d *ActivityExecutionDescription) GetLastFailure() error {
 	return d.FailureConverter.FailureToError(d.RawExecutionInfo.GetLastFailure())
 }
 
-// Summary returns summary of the activity. See ActivityOptions.Summary. Returns empty string if there is no summary.
-// Uses DataConverter for converting the summary payload to string.
-func (d *ActivityExecutionDescription) Summary() string {
-	return d.DataConverter.ToString(d.RawExecutionInfo.GetUserMetadata().GetSummary())
+// GetSummary returns summary of the activity. See ActivityOptions.Summary. Returns empty string if there is no summary.
+// Uses DataConverter for converting the summary payload to string. Returns error if data conversion fails.
+func (d *ActivityExecutionDescription) GetSummary() (string, error) {
+	payload := d.RawExecutionInfo.GetUserMetadata().GetSummary()
+	if payload == nil {
+		return "", nil
+	}
+	var summary string
+	err := d.DataConverter.FromPayload(payload, &summary)
+	if err != nil {
+		return "", err
+	}
+	return summary, nil
 }
 
 func (h *activityHandleImpl) GetID() string {
@@ -208,7 +217,11 @@ func (h *activityHandleImpl) Get(ctx context.Context, valuePtr any) error {
 			return h.client.failureConverter.FailureToError(failure)
 		}
 		if result := resp.GetOutcome().GetResult(); result != nil {
-			return h.client.dataConverter.FromPayloads(result, valuePtr)
+			if valuePtr == nil {
+				return nil
+			} else {
+				return h.client.dataConverter.FromPayloads(result, valuePtr)
+			}
 		}
 	}
 }
