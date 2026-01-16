@@ -321,24 +321,11 @@ func WithActivityTask(
 	heartbeatTimeout := task.GetHeartbeatTimeout().AsDuration()
 	deadline := calculateActivityDeadline(scheduled, scheduleToCloseTimeout, startToCloseTimeout)
 
-	logger = log.With(logger,
-		tagActivityID, task.ActivityId,
-		tagActivityType, task.ActivityType.GetName(),
-		tagAttempt, task.Attempt,
-		tagWorkflowType, task.WorkflowType.GetName(),
-		tagWorkflowID, task.WorkflowExecution.WorkflowId,
-		tagRunID, task.WorkflowExecution.RunId,
-	)
-
-	return newActivityContext(ctx, interceptors, &activityEnvironment{
-		taskToken:      task.TaskToken,
-		serviceInvoker: invoker,
-		activityType:   ActivityType{Name: task.ActivityType.GetName()},
-		activityID:     task.ActivityId,
-		workflowExecution: WorkflowExecution{
-			RunID: task.WorkflowExecution.RunId,
-			ID:    task.WorkflowExecution.WorkflowId},
-		logger:                 logger,
+	env := &activityEnvironment{
+		taskToken:              task.TaskToken,
+		serviceInvoker:         invoker,
+		activityType:           ActivityType{Name: task.ActivityType.GetName()},
+		activityID:             task.ActivityId,
 		metricsHandler:         metricsHandler,
 		deadline:               deadline,
 		heartbeatTimeout:       heartbeatTimeout,
@@ -351,15 +338,41 @@ func WithActivityTask(
 		attempt:                task.GetAttempt(),
 		priority:               task.GetPriority(),
 		heartbeatDetails:       task.HeartbeatDetails,
-		workflowType: &WorkflowType{
+		namespace:              task.WorkflowNamespace,
+		retryPolicy:            convertFromPBRetryPolicy(task.RetryPolicy),
+		workerStopChannel:      workerStopChannel,
+		contextPropagators:     contextPropagators,
+		client:                 client,
+	}
+
+	isWorkflowActivity := task.WorkflowExecution.GetWorkflowId() != ""
+	if isWorkflowActivity {
+		env.workflowExecution = WorkflowExecution{
+			RunID: task.WorkflowExecution.GetRunId(),
+			ID:    task.WorkflowExecution.GetWorkflowId(),
+		}
+		env.workflowType = &WorkflowType{
 			Name: task.WorkflowType.GetName(),
-		},
-		namespace:          task.WorkflowNamespace,
-		retryPolicy:        convertFromPBRetryPolicy(task.RetryPolicy),
-		workerStopChannel:  workerStopChannel,
-		contextPropagators: contextPropagators,
-		client:             client,
-	})
+		}
+		env.logger = log.With(logger,
+			tagActivityID, task.ActivityId,
+			tagActivityType, task.ActivityType.GetName(),
+			tagAttempt, task.Attempt,
+			tagWorkflowType, task.WorkflowType.GetName(),
+			tagWorkflowID, task.WorkflowExecution.GetWorkflowId(),
+			tagRunID, task.WorkflowExecution.GetRunId(),
+		)
+	} else {
+		env.activityRunID = task.ActivityRunId
+		env.logger = log.With(logger,
+			tagActivityID, task.ActivityId,
+			tagActivityRunID, task.ActivityRunId,
+			tagActivityType, task.ActivityType.GetName(),
+			tagAttempt, task.Attempt,
+		)
+	}
+
+	return newActivityContext(ctx, interceptors, env)
 }
 
 // WithLocalActivityTask adds local activity specific information into context.

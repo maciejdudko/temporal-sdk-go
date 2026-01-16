@@ -129,6 +129,7 @@ type (
 		client                 *WorkflowClient
 		priority               *commonpb.Priority
 		retryPolicy            *RetryPolicy
+		activityRunID          string
 	}
 
 	// context.WithValue need this type instead of basic type string to avoid lint error
@@ -375,7 +376,7 @@ func (a *activityEnvironmentInterceptor) GetInfo(ctx context.Context) ActivityIn
 		IsLocalActivity:        a.env.isLocalActivity,
 		Priority:               convertFromPBPriority(a.env.priority),
 		RetryPolicy:            a.env.retryPolicy,
-		ActivityRunID:          "", // TODO after added in API
+		ActivityRunID:          a.env.activityRunID,
 	}
 }
 
