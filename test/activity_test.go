@@ -239,7 +239,7 @@ func (a *Activities) failNTimes(_ context.Context, times int, id int) error {
 func (a *Activities) InspectActivityInfo(ctx context.Context, namespace, taskQueue, wfType string, isLocalActivity bool, scheduleToCloseTimeout, startToCloseTimeout time.Duration, retryPolicy *temporal.RetryPolicy) error {
 	a.append("inspectActivityInfo")
 	if !activity.IsActivity(ctx) {
-		return fmt.Errorf("expected IsActivity to return %v but got %v", true, activity.IsActivity(ctx))
+		return fmt.Errorf("expected IsActivity to be true")
 	}
 
 	info := activity.GetInfo(ctx)
@@ -299,7 +299,7 @@ func (a *Activities) InspectActivityInfo(ctx context.Context, namespace, taskQue
 func (a *Activities) InspectActivityInfoNoWorkflow(ctx context.Context, namespace, activityID, taskQueue string, scheduleToCloseTimeout, startToCloseTimeout time.Duration, retryPolicy *temporal.RetryPolicy) error {
 	a.append("inspectActivityInfoNoWorkflow")
 	if !activity.IsActivity(ctx) {
-		return fmt.Errorf("expected IsActivity to return %v but got %v", true, activity.IsActivity(ctx))
+		return fmt.Errorf("expected IsActivity to be true")
 	}
 
 	info := activity.GetInfo(ctx)
